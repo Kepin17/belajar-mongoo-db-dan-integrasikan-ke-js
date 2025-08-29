@@ -1,6 +1,5 @@
 import type { Request, Response } from "express";
 const categories = require("../models/categoryMovie");
-const { Movie } = require("../models/movie");
 
 export const getCategories = async (req: Request, res: Response) => {
   try {
@@ -8,9 +7,9 @@ export const getCategories = async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 10;
 
     const offset = (page - 1) * limit;
-    const movies = await Movie.find().skip(offset).limit(limit);
+    const movies = await categories.find().skip(offset).limit(limit);
 
-    const total = await Movie.countDocuments();
+    const total = await categories.countDocuments();
 
     res.status(200).json({
       success: true,
@@ -34,6 +33,12 @@ export const addCategory = async (req: Request, res: Response) => {
 
     if (name === "") return res.status(400).json({ message: "Name is required" });
 
+    // check duplicate
+
+    const findCategory = await categories.findOne({ name });
+
+    if (findCategory) return res.status(400).json({ message: "Category already exists" });
+
     const newCategory = new categories({
       name,
     });
@@ -49,14 +54,25 @@ export const addCategory = async (req: Request, res: Response) => {
   }
 };
 
-export const updateCategory = async (req: Request, res: Response) => {
+export const updateCategory = async (req: Request<{ _id: string }>, res: Response) => {
   try {
     const { _id } = req.params;
-    const { name }: { name: string } = req.body;
+    const { name } = req.body;
 
-    if (name === "") return res.status(400).json({ message: "Name is required" });
+    if (!_id) {
+      return res.status(400).json({ message: "Category ID is required" });
+    }
+
+    if (!name || name.trim() === "") {
+      return res.status(400).json({ message: "Name is required" });
+    }
 
     const updatedCategory = await categories.findByIdAndUpdate(_id, { name }, { new: true });
+
+    if (!updatedCategory) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+
     res.status(200).json({
       message: "Category updated successfully",
       category: updatedCategory,
